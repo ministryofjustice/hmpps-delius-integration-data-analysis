@@ -8,7 +8,7 @@ with sent_referral as (
 			'urn:hmpps:interventions-referral:'||r.id||'\\n'||
 			'Referral Sent for '||ct.name||' Referral '||r.reference_number||
 			' with Prime Provider '||sp.name notes,
-			date(r.sent_at) referral_start,
+			to_char(r.sent_at at time zone 'Europe/London', 'YYYY-MM-DD') referral_start,
 	        end_requested_at,
 	        concluded_at,
 			to_char(greatest(r.sent_at, end_requested_at, concluded_at)
@@ -20,6 +20,7 @@ with sent_referral as (
 	inner join contract_type ct on ct.id = dfc.contract_type_id
 	inner join service_provider sp on sp.id = dfc.prime_provider_id
 	left join end_of_service_report eosr on eosr.referral_id = r.id
+	where sent_at is not null
 ),
 referral_contact as (
 	select 	referral_id,
@@ -34,7 +35,7 @@ referral_contact as (
 	             when a.attended in ('NO') then 'N'
                  else null end attended,
 	        a.notifyppof_attendance_behaviour,
-	        case when a.notifyppof_attendance_behaviour = true then 'N'
+	        case when a.notifyppof_attendance_behaviour = true or a.attended = 'NO' then 'N'
 	             when a.notifyppof_attendance_behaviour = false then 'Y'
 	             else null end complied
 	from appointment a
@@ -74,9 +75,11 @@ referral_contact as (
 			to_char((appointment_time + (duration_in_minutes::text||' minute')::INTERVAL)
 					at time zone 'Europe/London', 'YYYY-MM-DD HH24:MI:SS') contact_end_time,
 	        a.delius_appointment_id,
-	        case when a.attended in ('LATE','YES') then 'Y' else null end attended,
+	        case when a.attended in ('LATE','YES') then 'Y'
+	             when a.attended in ('NO') then 'N'
+                 else null end attended,
 	        a.notifyppof_attendance_behaviour,
-	        case when a.notifyppof_attendance_behaviour = true then 'N'
+	        case when a.notifyppof_attendance_behaviour = true or a.attended = 'NO' then 'N'
 	             when a.notifyppof_attendance_behaviour = false then 'Y'
 	             else null end complied
 	from appointment a
